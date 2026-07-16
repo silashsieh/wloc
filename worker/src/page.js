@@ -146,8 +146,34 @@ body { font-family:-apple-system,system-ui,"SF Pro","Helvetica Neue",sans-serif;
 <script>
 const SAVE_API = 'https://gs-loc.apple.com/wloc-settings/save';
 const FAV_KEY = 'wloc_favorites';
-let lat = 22.544577, lon = 113.94114;
-let selected = false;
+const LAST_POSITION_KEY = 'wloc_last_location';
+const DEFAULT_POSITION = { lat: 22.544577, lon: 113.94114 };
+
+function isValidPosition(position) {
+  return Boolean(position) &&
+    Number.isFinite(position.lat) && position.lat >= -90 && position.lat <= 90 &&
+    Number.isFinite(position.lon) && position.lon >= -180 && position.lon <= 180;
+}
+
+function loadLastPosition() {
+  try {
+    const position = JSON.parse(localStorage.getItem(LAST_POSITION_KEY));
+    return isValidPosition(position) ? position : null;
+  } catch(e) {
+    return null;
+  }
+}
+
+function saveLastPosition() {
+  try {
+    localStorage.setItem(LAST_POSITION_KEY, JSON.stringify({ lat, lon }));
+  } catch(e) {}
+}
+
+const rememberedPosition = loadLastPosition();
+let lat = rememberedPosition ? rememberedPosition.lat : DEFAULT_POSITION.lat;
+let lon = rememberedPosition ? rememberedPosition.lon : DEFAULT_POSITION.lon;
+let selected = Boolean(rememberedPosition);
 let activeLon = null, activeLat = null;
 
 const map = L.map('map').setView([lat, lon], 13);
@@ -168,14 +194,21 @@ function switchLayer(name) {
   document.querySelectorAll('.layer-btn').forEach(b => b.classList.toggle('active', b.dataset.layer === name));
 }
 let marker = L.marker([lat, lon], {draggable:true}).addTo(map);
+if (selected) updateCoordsText();
 
 marker.on('dragend', e => { const p=e.target.getLatLng(); setPos(p.lat, p.lng); });
 map.on('click', e => { setPos(e.latlng.lat, e.latlng.lng); });
 
+function updateCoordsText() {
+  document.getElementById('coords').textContent = '经度 ' + lon.toFixed(6) + '  纬度 ' + lat.toFixed(6);
+}
+
 function setPos(newLat, newLon) {
+  if (!isValidPosition({ lat: newLat, lon: newLon })) return;
   lat = newLat; lon = newLon; selected = true;
   marker.setLatLng([lat, lon]);
-  document.getElementById('coords').textContent = '经度 ' + lon.toFixed(6) + '  纬度 ' + lat.toFixed(6);
+  updateCoordsText();
+  saveLastPosition();
 }
 
 function moveTo(newLat, newLon, zoom) {
